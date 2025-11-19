@@ -109,6 +109,42 @@ def move_to_public_folder(file_path: str, video_storage_file_name: str) -> str:
     return f"/public/{video_storage_file_name}.mp4"
 
 
+@video_rendering_bp.route("/v1/health", methods=["GET"])
+def health_check():
+    """Health check endpoint that verifies Modal configuration"""
+    health_status = {
+        "status": "healthy",
+        "modal_enabled": USE_MODAL,
+        "modal_available": MODAL_AVAILABLE if USE_MODAL else "N/A",
+        "storage": "local" if USE_LOCAL_STORAGE else "s3",
+    }
+    
+    # Check Modal tokens if enabled
+    if USE_MODAL:
+        modal_token_id = os.getenv("MODAL_TOKEN_ID")
+        modal_token_secret = os.getenv("MODAL_TOKEN_SECRET")
+        
+        if not modal_token_id or not modal_token_secret:
+            health_status["modal_tokens"] = "❌ Missing - Check MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in .env"
+            health_status["status"] = "degraded"
+        else:
+            health_status["modal_tokens"] = "✅ Configured"
+            
+        if MODAL_AVAILABLE:
+            try:
+                # Try to call Modal health check
+                from api.modal_manim import health_check as modal_health
+                modal_result = modal_health.remote()
+                health_status["modal_health"] = modal_result
+            except Exception as e:
+                health_status["modal_health"] = f"❌ Error: {str(e)}"
+                health_status["status"] = "unhealthy"
+        else:
+            health_status["modal_health"] = "❌ Modal import failed - check dependencies"
+            health_status["status"] = "degraded"
+    
+    return jsonify(health_status), 200 if health_status["status"] == "healthy" else 503
+
 @video_rendering_bp.route("/v1/video/rendering", methods=["POST"])
 def render_video():
 

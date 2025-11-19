@@ -30,8 +30,7 @@ manim_image = (
         "curl",                    # HTTP client
     )
     .pip_install(
-        "manim==0.18.0",           # Match current project version
-        "pillow>=10.0.0",          # Image processing
+        "manim==0.18.0",           # Match current project version (includes compatible Pillow)
         "numpy>=1.24.0",           # Mathematical operations
         "scipy>=1.10.0",           # Scientific computing
         "matplotlib>=3.7.0",       # Additional plotting capabilities

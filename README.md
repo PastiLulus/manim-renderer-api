@@ -18,14 +18,53 @@ cd manim-api
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your Modal and S3 credentials
+```
+
+## Quick Setup
+
+### 1. Install Modal and Authenticate
+
+```bash
+pip install modal
+modal setup  # Follow the prompts to authenticate
+```
+
+Or set tokens directly:
+```bash
+modal token set --token-id YOUR_TOKEN_ID --token-secret YOUR_TOKEN_SECRET
+```
+
+Get your tokens from https://modal.com/settings/tokens
+
+### 2. **CRITICAL: Deploy to Modal** ⚠️
+
+**This step is REQUIRED before running the API!**
+
+```bash
+modal deploy api/modal_manim.py
+```
+
+**First deployment takes 5-10 minutes** (installs LaTeX, FFmpeg, Manim, etc.)
+Subsequent deployments are instant.
+
+You should see:
+```
+✓ Created objects.
+├── 🔨 Created function compile_manim_animation
+└── 🔨 Created function health_check
+```
+
+### 3. Start the API
+
+```bash
 python run.py
 ```
 
 API runs on `http://localhost:8080`
 
-## Quick Setup
+**Note**: If Modal deployment hasn't completed, the API will return "Function has not been hydrated" errors.
 
-See [MODAL_DEPLOYMENT.md](MODAL_DEPLOYMENT.md) for detailed Modal.com setup instructions.
+See [MODAL_DEPLOYMENT.md](MODAL_DEPLOYMENT.md) for detailed setup instructions.
 
 ## Configuration
 
@@ -56,6 +95,32 @@ PORT=8080  # optional
 See [`.env.example`](.env.example) for all configuration options.
 
 ## Usage
+
+### Health Check
+
+First, verify your Modal configuration is correct:
+
+```bash
+curl http://localhost:8080/v1/health
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "modal_enabled": true,
+  "modal_available": true,
+  "modal_tokens": "✅ Configured",
+  "modal_health": {
+    "status": "healthy",
+    "manim_version": "0.18.0",
+    "ffmpeg_available": true
+  },
+  "storage": "s3"
+}
+```
+
+### Generate Videos
 
 Generate video from Manim code:
 
@@ -98,17 +163,63 @@ Parameters:
 - `rendering_engine`: "cairo", "opengl" (optional)
 - `stream`: true/false for progress streaming (optional)
 
+## Testing
+
+Run the test script to verify Modal integration:
+
+```bash
+# Test the API with sample Manim scenes
+python test_api.py
+```
+
+The test script will:
+- Test simple circle scene (non-streaming)
+- Test animated scene with streaming progress
+- Test complex scene with multiple objects
+- Verify video URLs are accessible
+
 ## Docker
 
 ```bash
 docker build -t manim-api .
 docker run -p 8080:8080 \
+  -e USE_MODAL=true \
+  -e MODAL_TOKEN_ID=your_modal_token_id \
+  -e MODAL_TOKEN_SECRET=your_modal_token_secret \
   -e S3_ENDPOINT=https://sgp1.digitaloceanspaces.com \
   -e S3_REGION=sgp1 \
   -e S3_ACCESS_KEY_ID=your_access_key \
   -e S3_SECRET_ACCESS_KEY=your_secret_key \
   -e S3_BUCKET=your-bucket \
   manim-api
+```
+
+## Deployment
+
+### Modal Deployment
+
+Before running the API, deploy the Modal function:
+
+```bash
+# Deploy to Modal
+modal deploy api/modal_manim.py
+```
+
+First deployment takes 5-10 minutes to build the container (installs LaTeX, FFmpeg, etc.). Subsequent deployments are instant.
+
+### Local Development
+
+For local testing without Modal:
+
+```bash
+# Disable Modal in .env
+USE_MODAL=false
+
+# Make sure Manim is installed locally
+pip install manim
+
+# Start the API
+python run.py
 ```
 
 ## Storage Configuration
@@ -125,3 +236,31 @@ Set `USE_LOCAL_STORAGE=false` and configure S3 environment variables. Supports:
 - Any S3-compatible storage service
 
 See [`.env.example`](.env.example) for detailed configuration options.
+
+## Troubleshooting
+
+### Modal Issues
+
+**"Function has not been hydrated"**
+- The Modal app hasn't been deployed yet
+- Run: `modal deploy api/modal_manim.py`
+
+**Modal import fails**
+- Install Modal: `pip install modal`
+- Authenticate: `modal token set --token-id YOUR_ID --token-secret YOUR_SECRET`
+
+**Slow first deployment**
+- Expected - building container with LaTeX/FFmpeg (~5-10 min)
+- Subsequent deployments are instant (uses cached image)
+
+### Video Rendering Issues
+
+**"Video file not found"**
+- Check that `file_class` matches your Scene class name exactly
+- Verify your Manim code syntax is correct
+
+**Timeout errors**
+- Complex animations may need more time
+- Consider using `quality="low_quality"` for testing
+
+For more help, see [`MODAL_DEPLOYMENT.md`](MODAL_DEPLOYMENT.md)
