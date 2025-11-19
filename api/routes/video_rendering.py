@@ -20,14 +20,15 @@ USE_MODAL = os.getenv("USE_MODAL", "true").lower() == "true"
 # Import Modal integration if enabled
 if USE_MODAL:
     try:
-        from api.modal_manim import compile_manim_animation
         import modal
+        # Use from_name for deployed functions (correct way per Modal docs)
+        compile_manim_animation = modal.Function.from_name("manim-renderer-api", "compile_manim_animation")
         MODAL_AVAILABLE = True
         print("[INFO] Modal integration enabled and available")
-    except ImportError as e:
+    except Exception as e:
         MODAL_AVAILABLE = False
         USE_MODAL = False
-        print(f"[WARNING] Modal import failed: {e}. Falling back to local rendering.")
+        print(f"[WARNING] Modal lookup failed: {e}. Falling back to local rendering.")
 else:
     MODAL_AVAILABLE = False
     print("[INFO] Modal integration disabled, using local rendering")
