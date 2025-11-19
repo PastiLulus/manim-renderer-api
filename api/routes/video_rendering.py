@@ -4,7 +4,8 @@ import os
 import re
 import json
 import traceback
-from azure.storage.blob import BlobServiceClient
+import boto3
+from botocore.exceptions import ClientError
 import shutil
 from typing import Union
 import uuid
@@ -17,25 +18,67 @@ USE_LOCAL_STORAGE = os.getenv("USE_LOCAL_STORAGE", "false").lower() == "true"
 
 video_rendering_bp = Blueprint("video_rendering", __name__)
 
-def upload_to_azure_storage(file_path: str, video_storage_file_name: str) -> str:
+def upload_to_s3(file_path: str, video_storage_file_name: str) -> str:
+    """Upload file to S3-compatible storage and return public URL"""
     cloud_file_name = f"{video_storage_file_name}.mp4"
-
-    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-    container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
     
-    if not connection_string:
-        raise ValueError("Environment variable is not set")
+    # Get S3 configuration from environment
+    s3_endpoint = os.getenv("S3_ENDPOINT")
+    s3_region = os.getenv("S3_REGION")
+    s3_access_key = os.getenv("S3_ACCESS_KEY_ID")
+    s3_secret_key = os.getenv("S3_SECRET_ACCESS_KEY")
+    s3_bucket = os.getenv("S3_BUCKET")
+    s3_public_url_base = os.getenv("S3_PUBLIC_URL_BASE")
+    s3_force_path_style = os.getenv("S3_FORCE_PATH_STYLE", "true").lower() == "true"
     
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    blob_client = blob_service_client.get_blob_client(
-        container=container_name, blob=cloud_file_name
-    )
-
-    with open(file_path, "rb") as data:
-        blob_client.upload_blob(data, overwrite=True)
-
-    blob_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{container_name}/{cloud_file_name}"
-    return blob_url
+    if not all([s3_access_key, s3_secret_key, s3_bucket]):
+        raise ValueError("S3 configuration environment variables are not set")
+    
+    # Configure S3 client
+    s3_config = {
+        'aws_access_key_id': s3_access_key,
+        'aws_secret_access_key': s3_secret_key,
+        'region_name': s3_region
+    }
+    
+    if s3_endpoint:
+        s3_config['endpoint_url'] = s3_endpoint
+    
+    # Create S3 client with path-style configuration
+    from botocore.config import Config
+    boto_config = Config(s3={'addressing_style': 'path' if s3_force_path_style else 'virtual'})
+    
+    s3_client = boto3.client('s3', config=boto_config, **s3_config)
+    
+    # Upload file to S3
+    try:
+        with open(file_path, 'rb') as data:
+            s3_client.upload_fileobj(
+                data,
+                s3_bucket,
+                cloud_file_name,
+                ExtraArgs={'ACL': 'public-read', 'ContentType': 'video/mp4'}
+            )
+    except ClientError as e:
+        raise Exception(f"Failed to upload to S3: {str(e)}")
+    
+    # Generate public URL
+    if s3_public_url_base:
+        # Use custom CDN/public URL if provided
+        file_url = f"{s3_public_url_base.rstrip('/')}/{cloud_file_name}"
+    elif s3_endpoint:
+        # Use S3-compatible endpoint URL
+        if s3_force_path_style:
+            file_url = f"{s3_endpoint.rstrip('/')}/{s3_bucket}/{cloud_file_name}"
+        else:
+            # Virtual-hosted-style URL
+            endpoint_without_protocol = s3_endpoint.replace('https://', '').replace('http://', '')
+            file_url = f"https://{s3_bucket}.{endpoint_without_protocol}/{cloud_file_name}"
+    else:
+        # AWS S3 default URL format
+        file_url = f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{cloud_file_name}"
+    
+    return file_url
 
 
 def move_to_public_folder(file_path: str, video_storage_file_name: str) -> str:
@@ -209,7 +252,7 @@ from math import *
                     if USE_LOCAL_STORAGE:
                         video_url = move_to_public_folder(video_file_path, video_storage_file_name)
                     else:
-                        video_url = upload_to_azure_storage(video_file_path, video_storage_file_name)
+                        video_url = upload_to_s3(video_file_path, video_storage_file_name)
 
                     print(f"Video URL: {video_url}")
                     if stream:

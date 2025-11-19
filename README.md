@@ -19,8 +19,19 @@ API runs on `http://localhost:8080`
 Required environment variables:
 
 ```env
+# Storage Configuration
 USE_LOCAL_STORAGE=false  # true for local storage
-AZURE_STORAGE_CONNECTION_STRING=your_string  # required when USE_LOCAL_STORAGE=false
+
+# S3 Configuration (required when USE_LOCAL_STORAGE=false)
+S3_ENDPOINT=https://sgp1.digitaloceanspaces.com  # S3-compatible endpoint
+S3_REGION=sgp1  # S3 region
+S3_ACCESS_KEY_ID=your_access_key_id
+S3_SECRET_ACCESS_KEY=your_secret_access_key
+S3_BUCKET=your-bucket-name
+S3_PUBLIC_URL_BASE=  # Optional: Custom CDN URL
+S3_FORCE_PATH_STYLE=true  # true for most S3-compatible services
+
+# Server Configuration
 PORT=8080  # optional
 ```
 
@@ -58,7 +69,7 @@ Response:
 {"animationIndex": 0, "percentage": 37}
 {"animationIndex": 0, "percentage": 67}
 {"animationIndex": 0, "percentage": 98}
-{ "video_url": "https://manimapi.blob.core.windows.net/manimcontainer/video-1a4fe592-2232-4167-b4d2-15d4fc249c6d.mp4", "processingTime": 4.466716766357422 }
+{ "video_url": "https://sgp1.digitaloceanspaces.com/your-bucket/video-1a4fe592-2232-4167-b4d2-15d4fc249c6d.mp4", "processingTime": 4.466716766357422 }
 ```
 
 Parameters:
@@ -71,5 +82,26 @@ Parameters:
 
 ```bash
 docker build -t manim-api .
-docker run -p 8080:8080 -e AZURE_STORAGE_CONNECTION_STRING=your_string manim-api
+docker run -p 8080:8080 \
+  -e S3_ENDPOINT=https://sgp1.digitaloceanspaces.com \
+  -e S3_REGION=sgp1 \
+  -e S3_ACCESS_KEY_ID=your_access_key \
+  -e S3_SECRET_ACCESS_KEY=your_secret_key \
+  -e S3_BUCKET=your-bucket \
+  manim-api
 ```
+
+## Storage Configuration
+
+The API supports both local storage and S3-compatible storage:
+
+### Local Storage
+Set `USE_LOCAL_STORAGE=true` to store videos in the local filesystem under `api/public/`.
+
+### S3-Compatible Storage
+Set `USE_LOCAL_STORAGE=false` and configure S3 environment variables. Supports:
+- AWS S3
+- DigitalOcean Spaces
+- Any S3-compatible storage service
+
+See [`.env.example`](.env.example) for detailed configuration options.
