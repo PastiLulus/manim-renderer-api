@@ -4,6 +4,7 @@ werkzeug==2.3.7
 ffmpeg==1.4
 openai==1.59.9
 manim==0.18.0
+modal==0.64.117
 python-dotenv>=0.21.0,<0.22.0
 bs4==0.0.1
 langchain==0.3.15

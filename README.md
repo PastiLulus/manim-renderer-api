@@ -1,6 +1,14 @@
 # Manim API
 
-Flask REST API for generating Manim animations.
+Flask REST API for generating Manim animations using Modal.com for serverless rendering.
+
+## Features
+
+- 🚀 **Serverless Rendering**: Uses [Modal.com](https://modal.com) for scalable, containerized Manim rendering
+- 📦 **No Local Dependencies**: No need to install LaTeX, FFmpeg, or Manim locally
+- 🔄 **Automatic Fallback**: Falls back to local rendering if Modal is unavailable
+- ☁️ **S3 Storage**: Supports S3-compatible storage for video files
+- 📊 **Progress Streaming**: Real-time rendering progress updates
 
 ## Installation
 
@@ -9,16 +17,26 @@ git clone <repository-url>
 cd manim-api
 pip install -r requirements.txt
 cp .env.example .env
+# Edit .env with your Modal and S3 credentials
 python run.py
 ```
 
 API runs on `http://localhost:8080`
+
+## Quick Setup
+
+See [MODAL_DEPLOYMENT.md](MODAL_DEPLOYMENT.md) for detailed Modal.com setup instructions.
 
 ## Configuration
 
 Required environment variables:
 
 ```env
+# Modal Configuration (Serverless Rendering)
+USE_MODAL=true  # Set to false to use local rendering
+MODAL_TOKEN_ID=ak-xxxxxxxxxxxxx  # Get from https://modal.com/settings/tokens
+MODAL_TOKEN_SECRET=as-xxxxxxxxxxxxx
+
 # Storage Configuration
 USE_LOCAL_STORAGE=false  # true for local storage
 
@@ -34,6 +52,8 @@ S3_FORCE_PATH_STYLE=true  # true for most S3-compatible services
 # Server Configuration
 PORT=8080  # optional
 ```
+
+See [`.env.example`](.env.example) for all configuration options.
 
 ## Usage
 

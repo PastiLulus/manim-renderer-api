@@ -15,6 +15,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 USE_LOCAL_STORAGE = os.getenv("USE_LOCAL_STORAGE", "false").lower() == "true"
+USE_MODAL = os.getenv("USE_MODAL", "true").lower() == "true"
+
+# Import Modal integration if enabled
+if USE_MODAL:
+    try:
+        from api.modal_manim import compile_manim_animation
+        import modal
+        MODAL_AVAILABLE = True
+        print("[INFO] Modal integration enabled and available")
+    except ImportError as e:
+        MODAL_AVAILABLE = False
+        USE_MODAL = False
+        print(f"[WARNING] Modal import failed: {e}. Falling back to local rendering.")
+else:
+    MODAL_AVAILABLE = False
+    print("[INFO] Modal integration disabled, using local rendering")
 
 video_rendering_bp = Blueprint("video_rendering", __name__)
 
@@ -148,8 +164,82 @@ from math import *
 
     def render_video():
         video_file_path = None
+        
+        # Use Modal if enabled and available
+        if USE_MODAL and MODAL_AVAILABLE:
+            return render_video_modal()
+        else:
+            return render_video_local()
+    
+    def render_video_modal():
+        """Render video using Modal's serverless infrastructure"""
         try:
-            print("Starting video rendering")
+            print("[MODAL] Starting video rendering with Modal")
+            start_time = time.time()
+            
+            # Call Modal function
+            result = compile_manim_animation.remote(
+                python_code=modified_code,
+                class_name=file_class,
+                rendering_engine=rendering_engine or "cairo",
+                quality="medium_quality"  # Can be parameterized later
+            )
+            
+            if not result["success"]:
+                error_msg = result.get("error", "Unknown error")
+                logs = result.get("logs", "")
+                yield f'{{"error": {json.dumps(error_msg)}, "details": {json.dumps([logs])}}}\n'
+                return
+            
+            # Stream progress updates if available
+            if stream and result.get("progress_updates"):
+                for progress in result["progress_updates"]:
+                    yield f'{{"animationIndex": {progress["animationIndex"]}, "percentage": {progress["percentage"]}}}\n'
+            
+            # Save video bytes to temporary file
+            video_bytes = result["video_bytes"]
+            temp_video_path = os.path.join(public_dir, f"temp_{video_storage_file_name}.mp4")
+            
+            with open(temp_video_path, "wb") as f:
+                f.write(video_bytes)
+            
+            print(f"[MODAL] Video rendered successfully, size: {len(video_bytes)} bytes")
+            
+            # Upload to storage
+            if USE_LOCAL_STORAGE:
+                video_url = move_to_public_folder(temp_video_path, video_storage_file_name)
+            else:
+                video_url = upload_to_s3(temp_video_path, video_storage_file_name)
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_video_path)
+            except Exception as e:
+                print(f"[MODAL] Error removing temp file: {e}")
+            
+            processing_time = time.time() - start_time
+            print(f"[MODAL] Total processing time: {processing_time:.2f}s")
+            
+            if stream:
+                yield f'{{ "video_url": "{video_url}", "processingTime": {processing_time} }}\n'
+            else:
+                yield {
+                    "message": "Video generation completed",
+                    "video_url": video_url,
+                    "processingTime": processing_time
+                }
+        
+        except Exception as e:
+            print(f"[MODAL] Error: {str(e)}")
+            traceback.print_exc()
+            error_msg = f"Modal rendering failed: {str(e)}"
+            yield f'{{"error": {json.dumps(error_msg)}, "details": {json.dumps([str(e)])}}}\n'
+
+    def render_video_local():
+        """Render video using local subprocess (fallback)"""
+        video_file_path = None
+        try:
+            print("Starting local video rendering")
             start_time = time.time()
             output_dir = os.path.join(public_dir, str(uuid.uuid4()))
             os.makedirs(output_dir, exist_ok=True)
