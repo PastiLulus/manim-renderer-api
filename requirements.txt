@@ -1,33 +1,19 @@
+# Core Web Framework
 flask==2.2.2
 gunicorn==20.1.0
 werkzeug==2.3.7
-ffmpeg==1.4
-openai==1.59.9
-manim==0.18.0
-modal==0.64.117
-python-dotenv>=0.21.0,<0.22.0
-bs4==0.0.1
-langchain==0.3.15
-langchain_community==0.3.15
-langchain-openai==0.3.1
-langchain-anthropic==0.3.3
-langgraph==0.2.65
-anthropic==0.43.1
-google-cloud-logging==3.10.0
 flask-cors==3.0.10
-azure-storage-blob==12.18.2
-azure-monitor-opentelemetry==1.4.2
+
+# Environment Variables
+python-dotenv>=0.21.0,<0.22.0
+
+# Manim Animation
+ffmpeg==1.4
+manim==0.18.0
 manim-physics==0.4.0
-firebase_admin==6.2.0
-httpx==0.27.2
-pylsp-mypy==0.6.9
-manim-voiceover==0.3.7
+
+# Serverless Rendering
+modal==0.64.117
+
+# Storage (S3-compatible)
 boto3==1.37.3
-gTTS==2.5.4
-vastai==0.2.8
-pytest==8.3.5
-httpx==0.27.2
-pytest-asyncio==0.26.0
-opencv-python==4.8.1.78
-aiohttp==3.10.10
-tiktoken==0.8.0
